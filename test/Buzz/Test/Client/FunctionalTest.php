@@ -137,10 +137,22 @@ class FunctionalTest extends \PHPUnit_Framework_TestCase
 
     public function provideClient()
     {
-        return array(
+        $clients = array(
             array(new Curl()),
             array(new FileGetContents()),
         );
+
+        if (isset($_SERVER['TEST_PROXY'])) {
+            $client = new Curl();
+            $client->setProxy($_SERVER['TEST_PROXY']);
+            $clients[] = array($client);
+
+            $client = new FileGetContents();
+            $client->setProxy($_SERVER['TEST_PROXY']);
+            $clients[] = array($client);
+        }
+
+        return $clients;
     }
 
     public function provideClientAndMethod()

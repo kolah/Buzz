@@ -3,6 +3,7 @@
 namespace Buzz\Client;
 
 use Buzz\Message;
+use Buzz\Util;
 
 abstract class AbstractStream extends AbstractClient
 {
@@ -15,7 +16,7 @@ abstract class AbstractStream extends AbstractClient
      */
     public function getStreamContextArray(Message\Request $request)
     {
-        return array(
+        $options = array(
             'http' => array(
                 // values from the request
                 'method'           => $request->getMethod(),
@@ -32,5 +33,41 @@ abstract class AbstractStream extends AbstractClient
                 'verify_peer'      => $this->getVerifyPeer(),
             ),
         );
+
+        if ($proxy = $this->getProxy()) {
+            $options['http']['proxy'] = self::getProxyOption($proxy);
+            $options['http']['request_fulluri'] = true;
+        }
+
+        return $options;
+    }
+
+    /**
+     * Converts an URL to a proxy string option.
+     *
+     * @param Url $url The proxy URL
+     *
+     * @return string The proxy option
+     */
+    static private function getProxyOption(Util\Url $url)
+    {
+        static $schemeMap = array(
+            'http'  => 'tcp',
+            'https' => 'ssl',
+        );
+
+        $scheme = $url->getScheme();
+        $proxy  = isset($schemeMap[$scheme]) ? $schemeMap[$scheme] : $scheme;
+        $proxy .= '://';
+
+        if ($user = $url->getUser()) {
+            $proxy .= $user.':'.$url->getPassword().'@';
+        }
+
+        $proxy .= $url->getHostname();
+        $proxy .= ':';
+        $proxy .= $url->getPort();
+
+        return $proxy;
     }
 }

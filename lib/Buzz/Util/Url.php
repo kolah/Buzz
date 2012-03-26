@@ -4,6 +4,11 @@ namespace Buzz\Util;
 
 class Url
 {
+    static private $defaultPorts = array(
+        'http'  => 80,
+        'https' => 443,
+    );
+
     private $url;
     private $components;
 
@@ -33,6 +38,16 @@ class Url
                 $components['host'] = $host;
                 $components['path'] = '/'.$path;
             }
+        }
+
+        // default scheme
+        if (!isset($components['scheme'])) {
+            $components['scheme'] = 'http';
+        }
+
+        // default port
+        if (!isset($components['port']) && isset(self::$defaultPorts[$components['scheme']])) {
+            $components['port'] = self::$defaultPorts[$components['scheme']];
         }
 
         $this->url = $url;
@@ -86,19 +101,13 @@ class Url
      */
     public function getHost()
     {
-        // default ports
-        static $map = array(
-            'http'  => 80,
-            'https' => 443,
-        );
-
         if ($hostname = $this->parseUrl('host')) {
             $host  = $scheme = $this->parseUrl('scheme', 'http');
             $host .= '://';
             $host .= $hostname;
 
             $port = $this->parseUrl('port');
-            if ($port && (!isset($map[$scheme]) || $map[$scheme] != $port)) {
+            if ($port && (!isset(self::$defaultPorts[$scheme]) || self::$defaultPorts[$scheme] != $port)) {
                 $host .= ':'.$port;
             }
 

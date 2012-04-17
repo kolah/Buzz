@@ -3,6 +3,7 @@
 namespace Buzz\Client;
 
 use Buzz\Message;
+use Buzz\Util;
 
 class Curl extends AbstractClient implements ClientInterface
 {
@@ -146,14 +147,17 @@ class Curl extends AbstractClient implements ClientInterface
             curl_setopt($curl, CURLOPT_PROXY, $proxy->getHostname());
             curl_setopt($curl, CURLOPT_PROXYPORT, $proxy->getPort());
 
-            if ($user = $proxy->getUser()) {
-                curl_setopt($curl, CURLOPT_PROXYUSERPWD, $user.':'.$proxy->getPassword());
+            if ($proxy->getUser()) {
+                curl_setopt($curl, CURLOPT_PROXYAUTH, CURLAUTH_BASIC);
+                curl_setopt($curl, CURLOPT_PROXYUSERPWD, $proxy->format('u:a'));
             } else {
+                curl_setopt($curl, CURLOPT_PROXYAUTH, null);
                 curl_setopt($curl, CURLOPT_PROXYUSERPWD, null);
             }
         } else {
             curl_setopt($curl, CURLOPT_PROXY, null);
             curl_setopt($curl, CURLOPT_PROXYPORT, null);
+            curl_setopt($curl, CURLOPT_PROXYAUTH, null);
             curl_setopt($curl, CURLOPT_PROXYUSERPWD, null);
         }
     }

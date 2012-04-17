@@ -11,6 +11,7 @@ class Url
 
     private $url;
     private $components;
+    private $schemeMap = array();
 
     /**
      * Constructor.
@@ -54,9 +55,16 @@ class Url
         $this->components = $components;
     }
 
+    public function setSchemeMap(array $schemeMap)
+    {
+        $this->schemeMap = $schemeMap;
+    }
+
     public function getScheme()
     {
-        return $this->parseUrl('scheme');
+        $scheme = $this->parseUrl('scheme');
+
+        return isset($this->schemeMap[$scheme]) ? $this->schemeMap[$scheme] : $scheme;
     }
 
     public function getHostname()

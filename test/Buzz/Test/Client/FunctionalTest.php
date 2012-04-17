@@ -11,21 +11,36 @@ use Buzz\Message\Response;
 
 class FunctionalTest extends \PHPUnit_Framework_TestCase
 {
-    protected function setUp()
+    /**
+     * @dataProvider provideProxyClientAndUrl
+     */
+    public function testProxy($client, $proxy, $url)
     {
-        if (!isset($_SERVER['TEST_SERVER'])) {
-            $this->markTestSkipped('The test server is not configured.');
-        }
+        $client = $this->createClient($client, $proxy);
+
+        $request = new Request();
+        $request->fromUrl($url);
+        $response = new Response();
+
+        $client->send($request, $response);
+
+        $data = json_decode($response->getContent(), true);
+
+        $this->assertInternalType('array', $data);
+        $this->assertArrayHasKey('HTTP_VIA', $data['SERVER']);
     }
 
     /**
-     * @dataProvider provideClientAndMethod
+     * @dataProvider provideClientAndUrlAndMethod
      */
-    public function testRequestMethods($client, $method)
+    public function testRequestMethods($client, $proxy, $url, $method)
     {
+        $client = $this->createClient($client, $proxy);
+
         $request = new Request($method);
-        $request->fromUrl($_SERVER['TEST_SERVER']);
+        $request->fromUrl($url);
         $response = new Response();
+
         $client->send($request, $response);
 
         $data = json_decode($response->getContent(), true);
@@ -34,12 +49,14 @@ class FunctionalTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @dataProvider provideClient
+     * @dataProvider provideClientAndUrl
      */
-    public function testFormPost($client)
+    public function testFormPost($client, $proxy, $url)
     {
+        $client = $this->createClient($client, $proxy);
+
         $request = new FormRequest();
-        $request->fromUrl($_SERVER['TEST_SERVER']);
+        $request->fromUrl($url);
         $request->setField('company[name]', 'Google');
         $response = new Response();
         $client->send($request, $response);
@@ -51,12 +68,14 @@ class FunctionalTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @dataProvider provideClientAndUpload
+     * @dataProvider provideClientAndUrlAndUpload
      */
-    public function testFileUpload($client, $upload)
+    public function testFileUpload($client, $proxy, $url, $upload)
     {
+        $client = $this->createClient($client, $proxy);
+
         $request = new FormRequest();
-        $request->fromUrl($_SERVER['TEST_SERVER']);
+        $request->fromUrl($url);
         $request->setField('company[name]', 'Google');
         $request->setField('company[logo]', $upload);
         $response = new Response();
@@ -70,12 +89,14 @@ class FunctionalTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @dataProvider provideClient
+     * @dataProvider provideClientAndUrl
      */
-    public function testJsonPayload($client)
+    public function testJsonPayload($client, $proxy, $url)
     {
+        $client = $this->createClient($client, $proxy);
+
         $request = new Request(Request::METHOD_POST);
-        $request->fromUrl($_SERVER['TEST_SERVER']);
+        $request->fromUrl($url);
         $request->addHeader('Content-Type: application/json');
         $request->setContent(json_encode(array('foo' => 'bar')));
         $response = new Response();
@@ -88,13 +109,15 @@ class FunctionalTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @dataProvider provideClient
+     * @dataProvider provideClientAndUrl
      */
-    public function testConsecutiveRequests($client)
+    public function testConsecutiveRequests($client, $proxy, $url)
     {
+        $client = $this->createClient($client, $proxy);
+
         // request 1
         $request = new Request(Request::METHOD_PUT);
-        $request->fromUrl($_SERVER['TEST_SERVER']);
+        $request->fromUrl($url);
         $request->addHeader('Content-Type: application/json');
         $request->setContent(json_encode(array('foo' => 'bar')));
         $response = new Response();
@@ -119,12 +142,14 @@ class FunctionalTest extends \PHPUnit_Framework_TestCase
     }
 
     /**
-     * @dataProvider provideClient
+     * @dataProvider provideClientAndUrl
      */
-    public function testPlus($client)
+    public function testPlus($client, $proxy, $url)
     {
+        $client = $this->createClient($client, $proxy);
+
         $request = new FormRequest();
-        $request->fromUrl($_SERVER['TEST_SERVER']);
+        $request->fromUrl($url);
         $request->setField('math', '1+1=2');
         $response = new Response();
         $client->send($request, $response);
@@ -135,60 +160,131 @@ class FunctionalTest extends \PHPUnit_Framework_TestCase
         $this->assertEquals(array('math' => '1+1=2'), $fields);
     }
 
-    public function provideClient()
+    // internal
+
+    public function provideClientAndUrl()
     {
-        $clients = array(
-            array(new Curl()),
-            array(new FileGetContents()),
-        );
-
-        if (isset($_SERVER['TEST_PROXY'])) {
-            $client = new Curl();
-            $client->setProxy($_SERVER['TEST_PROXY']);
-            $clients[] = array($client);
-
-            $client = new FileGetContents();
-            $client->setProxy($_SERVER['TEST_PROXY']);
-            $clients[] = array($client);
-        }
-
-        return $clients;
+        return $this->cartesian($this->getClients(), $this->getProxies(), $this->getUrls());
     }
 
-    public function provideClientAndMethod()
+    public function provideProxyClientAndUrl()
+    {
+        return $this->cartesian($this->getClients(), $this->getProxies(false), $this->getUrls());
+    }
+
+    public function provideClientAndUrlAndMethod()
     {
         // HEAD is intentionally omitted
         // http://stackoverflow.com/questions/2603104/does-mod-php-honor-head-requests-properly
-
         $methods = array('GET', 'POST', 'PUT', 'DELETE', 'PATCH');
-        $clients = $this->provideClient();
 
-        $data = array();
-        foreach ($clients as $client) {
-            foreach ($methods as $method) {
-                $data[] = array($client[0], $method);
-            }
-        }
-
-        return $data;
+        return $this->cartesian($this->getClients(), $this->getProxies(), $this->getUrls(), $methods);
     }
 
-    public function provideClientAndUpload()
+    public function provideClientAndUrlAndUpload()
     {
-        $stringUpload = new FormUpload();
-        $stringUpload->setFilename('google.png');
-        $stringUpload->setContent(file_get_contents(__DIR__.'/../Message/Fixtures/google.png'));
+        $uploads = array();
+        $uploads[0] = new FormUpload();
+        $uploads[0]->setFilename('google.png');
+        $uploads[0]->setContent(file_get_contents(__DIR__.'/../Message/Fixtures/google.png'));
+        $uploads[1] = new FormUpload(__DIR__.'/../Message/Fixtures/google.png');
 
-        $uploads = array($stringUpload, new FormUpload(__DIR__.'/../Message/Fixtures/google.png'));
-        $clients = $this->provideClient();
+        return $this->cartesian($this->getClients(), $this->getProxies(), $this->getUrls(), $uploads);
+    }
 
-        $data = array();
-        foreach ($clients as $client) {
-            foreach ($uploads as $upload) {
-                $data[] = array($client[0], $upload);
+    // private
+
+    private function createClient($class, $proxy)
+    {
+        $class = 'Buzz\Client\\'.$class;
+
+        $client = new $class();
+        $client->setVerifyPeer(false);
+
+        if ($proxy) {
+            $client->setProxy($_SERVER[$proxy]);
+        }
+
+        return $client;
+    }
+
+    private function getClients()
+    {
+        return array(
+            'Curl',
+            'FileGetContents',
+        );
+    }
+
+    private function getProxies($includeEmpty = true)
+    {
+        $proxies = array_filter(array(
+            'TEST_PROXY',
+            'TEST_PROXY_AUTH',
+            'TEST_PROXY_SSL',
+            'TEST_PROXY_SSL_AUTH',
+        ), function($value) { return isset($_SERVER[$value]); });
+
+        if ($includeEmpty) {
+            $proxies[] = null;
+        }
+
+        return $proxies;
+    }
+
+    private function getUrls()
+    {
+        $servers = array();
+
+        if (isset($_SERVER['TEST_SERVER'])) {
+            $servers[] = $_SERVER['TEST_SERVER'];
+        }
+
+        if (isset($_SERVER['TEST_SERVER_SSL'])) {
+            $servers[] = $_SERVER['TEST_SERVER_SSL'];
+        }
+
+        if (!$servers) {
+            $this->markTestSkipped('There are no test servers configured.');
+        }
+
+        return $servers;
+    }
+
+    /**
+     * @see http://stackoverflow.com/questions/6311779/finding-cartesian-product-with-php-associative-arrays
+     */
+    private function cartesian()
+    {
+        $inputs = func_get_args();
+        $result = array();
+        while (list($key, $values) = each($inputs)) {
+            if (empty($values)) {
+                throw new \Exception('The '.$key.' value is empty.');
+            }
+
+            if (empty($result)) {
+                foreach($values as $value) {
+                    $result[] = array($key => $value);
+                }
+            } else {
+                $append = array();
+                foreach ($result as & $product) {
+                    $product[$key] = array_shift($values);
+                    $copy = $product;
+
+                    foreach ($values as $item) {
+                        $copy[$key] = $item;
+                        $append[] = $copy;
+                    }
+
+                    array_unshift($values, $product[$key]);
+                }
+
+                $result = array_merge($result, $append);
             }
         }
 
-        return $data;
+        return $result;
     }
 }

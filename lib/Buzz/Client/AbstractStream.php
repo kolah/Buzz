@@ -36,7 +36,14 @@ abstract class AbstractStream extends AbstractClient
 
         if ($proxy = $this->getProxy()) {
             $options['http']['proxy'] = self::getProxyOption($proxy);
-            $options['http']['request_fulluri'] = true;
+
+            if ($proxy->getUser()) {
+                if ($options['http']['header']) {
+                    $options['http']['header'] .= "\r\n";
+                }
+
+                $options['http']['header'] .= 'Proxy-Authorization: Basic '.base64_decode($proxy->getUser().':'.$proxy->getPassword());
+            }
         }
 
         return $options;
@@ -51,23 +58,12 @@ abstract class AbstractStream extends AbstractClient
      */
     static private function getProxyOption(Util\Url $url)
     {
-        static $schemeMap = array(
+        $url = clone $url;
+        $url->setSchemeMap(array(
             'http'  => 'tcp',
             'https' => 'ssl',
-        );
+        ));
 
-        $scheme = $url->getScheme();
-        $proxy  = isset($schemeMap[$scheme]) ? $schemeMap[$scheme] : $scheme;
-        $proxy .= '://';
-
-        if ($user = $url->getUser()) {
-            $proxy .= $user.':'.$url->getPassword().'@';
-        }
-
-        $proxy .= $url->getHostname();
-        $proxy .= ':';
-        $proxy .= $url->getPort();
-
-        return $proxy;
+        return $url->format('s://h:o');
     }
 }

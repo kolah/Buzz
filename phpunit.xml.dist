@@ -9,7 +9,12 @@
 
     <php>
         <!-- <server name="TEST_SERVER" value="http://localhost/buzz/test/server.php" /> -->
-        <!-- <server name="TEST_PROXY" value="127.0.0.1:8080" /> -->
+        <!-- <server name="TEST_SERVER_SSL" value="https://localhost/buzz/test/server.php" /> -->
+
+        <!-- <server name="TEST_PROXY" value="http://localhost:8080" /> -->
+        <!-- <server name="TEST_PROXY_AUTH" value="http://buzz:buzz@localhost:8081" /> -->
+        <!-- <server name="TEST_PROXY_SSL" value="https://localhost:8082" /> -->
+        <!-- <server name="TEST_PROXY_SSL_AUTH" value="https://buzz:buzz@localhost:8083" /> -->
     </php>
 
     <filter>

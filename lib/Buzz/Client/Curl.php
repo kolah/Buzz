@@ -2,11 +2,13 @@
 
 namespace Buzz\Client;
 
+use Buzz\Cookie;
 use Buzz\Message;
 
 class Curl extends AbstractClient implements ClientInterface
 {
     protected $curl;
+	protected $cookieJar;
 
     static protected function createCurlHandle()
     {
@@ -103,9 +105,22 @@ class Curl extends AbstractClient implements ClientInterface
         return $multipart ? $fields : http_build_query($fields);
     }
 
-    public function __construct()
+    public function __construct(Cookie\Jar $cookieJar = null)
     {
         $this->curl = static::createCurlHandle();
+        if ($cookieJar) {
+            $this->setCookieJar($cookieJar);
+        }
+    }
+
+    public function setCookieJar(Cookie\Jar $cookieJar)
+    {
+        $this->cookieJar = $cookieJar;
+    }
+
+    public function getCookieJar()
+    {
+        return $this->cookieJar;
     }
 
     public function getCurl()
@@ -119,6 +134,11 @@ class Curl extends AbstractClient implements ClientInterface
             $this->curl = static::createCurlHandle();
         }
 
+        if ($cookieJar = $this->getCookieJar()) {
+            $cookieJar->clearExpiredCookies();
+            $cookieJar->addCookieHeaders($request);
+        }
+
         $this->prepare($request, $response, $this->curl);
 
         $data = curl_exec($this->curl);
@@ -130,6 +150,10 @@ class Curl extends AbstractClient implements ClientInterface
         }
 
         $response->fromString(static::getLastResponse($data));
+
+        if ($cookieJar) {
+            $cookieJar->processSetCookieHeaders($request, $response);
+        }
     }
 
     protected function prepare(Message\Request $request, Message\Response $response, $curl)

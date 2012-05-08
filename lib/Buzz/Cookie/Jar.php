@@ -75,4 +75,12 @@ class Jar
       // reset array keys
       $this->cookies = array_values($this->cookies);
     }
+
+	/**
+	 * Removes all cookies.
+	 */
+	public function clearCookies()
+	{
+		$this->cookies = array();
+	}
 }
